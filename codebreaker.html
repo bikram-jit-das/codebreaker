@@ -76,7 +76,23 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .list{font:15px/1.7 "IBM Plex Mono",monospace;columns:2 16em}
 .heat{position:relative;aspect-ratio:1/1;max-width:560px}
 .heat canvas{position:absolute;inset:0;width:100%;height:100%}
-#heatTip{min-height:1.6em;font-weight:600}
+.heat{width:100%;margin:0 auto;cursor:crosshair}
+.pick{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.pick select{font:600 18px "IBM Plex Mono",monospace}
+.pbig{font:800 clamp(30px,5vw,44px)/1.1 Archivo,sans-serif;color:var(--hot);font-variant-numeric:tabular-nums;margin-top:10px}
+.pbig.sm{font-size:clamp(26px,4vw,36px);margin:0}
+.wchain{font:15px/2.1 "IBM Plex Mono",monospace;margin:10px 0 4px;word-break:break-word}
+.wchain span{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:0 6px;margin:0 1px;line-height:1.6}
+.wchain span b{color:var(--good)}
+.wchain i{font-style:normal;color:var(--mute);margin:0 2px}
+.wres{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:baseline}
+.wres small{color:var(--mute);font-size:14px}
+#wIn{flex:1;font-family:"IBM Plex Mono",monospace;font-size:17px;text-transform:uppercase}
+td.x{width:44px;text-align:center}
+td.x button{min-height:32px;padding:2px 8px;font-size:14px}
+.engl{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.engl .tools{display:grid;gap:16px;align-content:start}
+@media(max-width:860px){.engl{grid-template-columns:minmax(0,1fr)}.engl .fp{order:2}}
 @media(max-width:600px){.tiles{max-height:55vh;overflow:auto}nav a{padding:8px 12px;font-size:15px}.keyrow{grid-template-columns:repeat(9,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
 </style>
@@ -86,10 +102,10 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
   <h1>Monte Carlo Code Cracker</h1>
   <p class="sub">Watch a computer crack a secret code by making millions of small random guesses.</p>
   <nav id="tabs">
+    <a href="#english" data-t="english">What English looks like</a>
     <a href="#crack" data-t="crack">Crack it!</a>
     <a href="#caesar" data-t="caesar">Caesar warm-up</a>
     <a href="#collect" data-t="collect">Collect all six</a>
-    <a href="#english" data-t="english">What English looks like</a>
   </nav>
 </header>
 <main>
@@ -217,20 +233,40 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 <!-- ================= ENGLISH ================= -->
 <section id="s-english">
   <h2>What English looks like</h2>
-  <p class="lead">From about 3 million letters of <i>War and Peace</i>: how often each letter is followed by each other letter. This table is what the computer uses to score a guess.</p>
-  <div class="grid">
-    <div class="panel">
-      <h3>Letter-pair fingerprint</h3>
-      <div class="heat"><canvas id="heat" aria-label="Heatmap of letter pair chances"></canvas></div>
-      <p id="heatTip">Hover or tap a square.</p>
-      <p class="note">Rows: current letter. Columns: next letter. "_" means space. Darker means more common.</p>
+  <p class="lead">Chances counted from about 3 million letters of <i>War and Peace</i>. "_" means a space. This table is what the computer uses to score a guess.</p>
+  <div class="engl">
+    <div class="tools">
+      <div class="panel">
+        <h3>1. Chance that one letter follows another</h3>
+        <div class="pick">
+          <select id="pFirst" aria-label="First letter"></select>
+          <span>followed by</span>
+          <select id="pSecond" aria-label="Next letter"></select>
+        </div>
+        <div class="pbig" id="pOut"></div>
+        <p style="margin:4px 0 0" id="pText"></p>
+        <p class="note" id="pRank"></p>
+      </div>
+      <div class="panel">
+        <h3>2. Plausibility calculator</h3>
+        <div class="row">
+          <input type="text" id="wIn" value="THE" aria-label="Word or sentence" autocomplete="off" spellcheck="false">
+          <button class="go" id="wAdd">Add to list</button>
+        </div>
+        <div class="wchain" id="wChain"></div>
+        <div class="wres"><span class="pbig sm" id="wScore"></span><small id="wLog"></small></div>
+        <p class="note">We multiply the chance of every neighbouring pair, including the spaces before and after. A higher score means the text looks more like English.</p>
+        <div class="scroll"><table>
+          <thead><tr><th>Text</th><th class="n">Score</th><th class="n">Log score</th><th class="x"></th></tr></thead>
+          <tbody id="wBody"></tbody>
+        </table></div>
+        <div class="row" style="margin-top:8px"><button id="wReset">Reset list</button></div>
+      </div>
     </div>
-    <div class="panel">
-      <h3>Which looks most like English?</h3>
-      <div class="row"><input type="text" id="wIn" placeholder="Type a word or sentence" style="flex:1"><button class="go" id="wAdd">Score it</button><button id="wReset">Reset</button></div>
-      <div class="scroll" style="margin-top:10px"><table><thead><tr><th>Text</th><th class="n">Score</th><th class="n">Log score</th></tr></thead><tbody id="wBody"></tbody></table></div>
-      <p class="note">Score = the chances of every neighbouring pair multiplied together (including the spaces at the start and end). Higher means more English-like. The log score is easier for computers: closer to 0 is better.</p>
-      <div id="pairs" class="explain"></div>
+    <div class="panel fp">
+      <h3>The fingerprint: tap any square</h3>
+      <div class="heat"><canvas id="heat" aria-label="Grid of letter pair chances; tap a square to look it up"></canvas></div>
+      <p class="note">Row: current letter. Column: next letter. Stronger colour means more common. The chosen pair is outlined in orange.</p>
     </div>
   </div>
 </section>
@@ -260,9 +296,9 @@ const logScore = text => { const s = states(text); let t = 0; for (let i = 0; i 
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 /* ---------- tabs ---------- */
-const tabs = ['crack', 'caesar', 'collect', 'english'];
+const tabs = ['english', 'crack', 'caesar', 'collect'];
 function show() {
-  const t = tabs.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'crack';
+  const t = tabs.includes(location.hash.slice(1)) ? location.hash.slice(1) : tabs[0];
   for (const x of tabs) { $('s-' + x).classList.toggle('on', x === t); document.querySelector(`nav a[data-t=${x}]`).classList.toggle('on', x === t); }
   if (t === 'english') drawHeat();
   if (t === 'crack') drawChart();
@@ -469,45 +505,86 @@ drawDice(); drawHist();
 
 /* ================= ENGLISH ================= */
 const LAB = A + '_';
+const P = (a, b) => Math.exp(lp(a, b));
+const fmtPct = p => p >= 0.001 ? (100 * p).toFixed(p >= 0.1 ? 1 : 2) + '%' : (100 * p).toPrecision(2) + '%';
+const num = x => { if (x >= 0.001) return x.toPrecision(3).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, ''); const [m, e] = x.toExponential(2).split('e'); return `${m} × 10<sup>${e.replace('+', '')}</sup>`; };
+
+// 1. pair lookup
+const letterOpts = Array.from({ length: 27 }, (_, i) => `<option value="${i}">${LAB[i]}</option>`).join('');
+$('pFirst').innerHTML = letterOpts; $('pSecond').innerHTML = letterOpts;
+let sel = [19, 7];   // T followed by H
+function showPair() {
+  const [a, b] = sel; $('pFirst').value = a; $('pSecond').value = b;
+  const p = P(a, b);
+  $('pOut').textContent = fmtPct(p);
+  $('pText').innerHTML = a === 26 && b === 26 ? 'Two spaces in a row are counted as one space.'
+    : a === 26 ? `Chance that a word starts with <b>${A[b]}</b>.`
+    : b === 26 ? `Chance that <b>${A[a]}</b> is the last letter of a word.`
+    : `After <b>${A[a]}</b>, the next letter is <b>${A[b]}</b> about ${fmtPct(p)} of the time.`;
+  const row = Array.from({ length: 27 }, (_, j) => ({ j, p: P(a, j) })).sort((x, y) => y.p - x.p);
+  const rank = row.findIndex(r => r.j === b) + 1;
+  $('pRank').textContent = `Most likely after ${a === 26 ? 'a space' : A[a]}: ` + row.slice(0, 3).map(r => `${LAB[r.j]} ${fmtPct(r.p)}`).join(', ') + `. This pair ranks ${rank} of 27.`;
+  drawHeat();
+}
+$('pFirst').onchange = () => { sel[0] = +$('pFirst').value; showPair(); };
+$('pSecond').onchange = () => { sel[1] = +$('pSecond').value; showPair(); };
+
+// fingerprint grid (tap a square to choose a pair)
 const heatCv = $('heat');
 function drawHeat() {
   if (!heatCv.offsetParent) return;
   const W = heatCv.clientWidth, dpr = window.devicePixelRatio || 1;
   heatCv.width = W * dpr; heatCv.height = W * dpr; const g = heatCv.getContext('2d'); g.scale(dpr, dpr);
-  const ink = getComputedStyle(document.body).color, dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light' || document.documentElement.dataset.theme === 'dark';
-  const m = 20, cell = (W - m) / 27;
-  g.clearRect(0, 0, W, W); g.font = `${Math.max(9, Math.min(13, cell * 0.8))}px "IBM Plex Mono", monospace`; g.fillStyle = ink; g.textAlign = 'center'; g.textBaseline = 'middle';
-  for (let i = 0; i < 27; i++) { g.fillText(LAB[i], m + cell * (i + 0.5), m / 2); g.fillText(LAB[i], m / 2, m + cell * (i + 0.5)); }
-  for (let r = 0; r < 27; r++) for (let c = 0; c < 27; c++) {
-    const p = Math.exp(lp(r, c)), v = Math.pow(p, 0.5);
-    const shade = dark ? Math.round(18 + 237 * v) : Math.round(255 - 235 * v);
-    g.fillStyle = dark ? `rgb(${Math.round(shade * .55)},${Math.round(shade * .85)},${shade})` : `rgb(${shade},${shade},${shade})`;
-    g.fillRect(m + c * cell + 0.5, m + r * cell + 0.5, cell - 1, cell - 1);
+  const ink = getComputedStyle(document.body).color;
+  const dark = document.documentElement.dataset.theme === 'dark' || (document.documentElement.dataset.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+  const m = 20, c = (W - m) / 27;
+  g.clearRect(0, 0, W, W);
+  g.font = `${Math.max(9, Math.min(13, c * 0.75))}px "IBM Plex Mono", monospace`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (let i = 0; i < 27; i++) {
+    g.fillStyle = i === sel[1] ? '#e4572e' : ink; g.fillText(LAB[i], m + c * (i + .5), m / 2);
+    g.fillStyle = i === sel[0] ? '#e4572e' : ink; g.fillText(LAB[i], m / 2, m + c * (i + .5));
   }
+  for (let r = 0; r < 27; r++) for (let k = 0; k < 27; k++) {
+    const v = Math.min(1, 1.5 * Math.pow(P(r, k), 0.45)), t = dark ? v : 1 - v;
+    g.fillStyle = dark ? `rgb(${Math.round(20 + 90 * t)},${Math.round(20 + 176 * t)},${Math.round(25 + 230 * t)})`
+                       : `rgb(${Math.round(27 + 228 * t)},${Math.round(60 + 195 * t)},${Math.round(70 + 185 * t)})`;
+    g.fillRect(m + k * c + .5, m + r * c + .5, c - 1, c - 1);
+  }
+  g.strokeStyle = '#e4572e'; g.lineWidth = 2.5; g.strokeRect(m + sel[1] * c, m + sel[0] * c, c, c);
 }
-function heatAt(e) {
-  const rc = heatCv.getBoundingClientRect(), W = rc.width, m = 20, cell = (W - m) / 27;
-  const c = Math.floor((e.clientX - rc.left - m) / cell), r = Math.floor((e.clientY - rc.top - m) / cell);
-  if (r < 0 || c < 0 || r > 26 || c > 26) return;
-  const nm = i => i === 26 ? 'space' : A[i];
-  $('heatTip').textContent = `${nm(r)} followed by ${nm(c)}: ${(100 * Math.exp(lp(r, c))).toFixed(2)}%`;
-}
-heatCv.addEventListener('pointermove', heatAt); heatCv.addEventListener('pointerdown', heatAt);
+heatCv.addEventListener('pointerdown', e => {
+  const rc = heatCv.getBoundingClientRect(), m = 20, c = (rc.width - m) / 27;
+  const k = Math.floor((e.clientX - rc.left - m) / c), r = Math.floor((e.clientY - rc.top - m) / c);
+  if (r >= 0 && k >= 0 && r < 27 && k < 27) { sel = [r, k]; showPair(); }
+});
 const ro2 = new ResizeObserver(() => drawHeat()); ro2.observe(heatCv);
 
-const DEF_WORDS = ['THE', 'HTE', 'ETH', 'QXJ'];
+// 2. plausibility calculator
+function pairsOf(text) {
+  const st = states(text); let lg = 0; const parts = [];
+  for (let i = 0; i + 1 < st.length; i++) { const p = P(st[i], st[i + 1]); lg += Math.log(p); parts.push([st[i], st[i + 1], p]); }
+  return { parts, lg, p: Math.exp(lg) };
+}
+function calc() {
+  const t = $('wIn').value;
+  if (!t.trim()) { $('wChain').textContent = 'Type a word or sentence.'; $('wScore').textContent = ''; $('wLog').textContent = ''; return; }
+  const r = pairsOf(t), shown = r.parts.slice(0, 60);
+  $('wChain').innerHTML = shown.map(([a, b, p]) => `<span>${LAB[a]}${LAB[b]} <b>${num(p)}</b></span>`).join('<i>×</i>') + (r.parts.length > 60 ? '<i>× …</i>' : '');
+  $('wScore').innerHTML = '= ' + num(r.p);
+  $('wLog').textContent = `${r.parts.length} pairs · log score ${r.lg.toFixed(1)}`;
+}
+$('wIn').addEventListener('input', calc);
+const DEF_WORDS = ['THE'];
 let words = DEF_WORDS.slice();
 function drawWords() {
-  const rows = words.map(w => ({ w, s: logScore(w) })).sort((a, b) => b.s - a.s);
-  $('wBody').innerHTML = rows.map(r => `<tr><td style="font-family:'IBM Plex Mono',monospace">${esc(r.w)}</td><td class="n">${Math.exp(r.s) < 0.001 ? Math.exp(r.s).toExponential(1) : Math.exp(r.s).toFixed(4)}</td><td class="n">${r.s.toFixed(1)}</td></tr>`).join('');
-  const top = words[words.length - 1], st = states(top), nm = i => i === 26 ? '_' : A[i];
-  const parts = []; for (let i = 0; i + 1 < st.length && i < 40; i++) parts.push(`${nm(st[i])}${nm(st[i + 1])} ${(100 * Math.exp(lp(st[i], st[i + 1]))).toFixed(1)}%`);
-  $('pairs').innerHTML = `<p style="margin:10px 0 0"><b>Pairs in "${esc(top)}":</b> ${esc(parts.join(' × '))}${st.length > 41 ? ' …' : ''}</p>`;
+  const rows = words.map(t => ({ t, ...pairsOf(t) })).sort((a, b) => b.lg - a.lg);
+  $('wBody').innerHTML = rows.map(r => `<tr><td style="font-family:'IBM Plex Mono',monospace;word-break:break-word">${esc(r.t)}</td><td class="n">${num(r.p)}</td><td class="n">${r.lg.toFixed(1)}</td><td class="x"><button data-t="${esc(r.t)}" aria-label="Remove">✕</button></td></tr>`).join('') || '<tr><td colspan="4" class="note">Nothing in the list yet.</td></tr>';
 }
-$('wAdd').onclick = () => { const w = $('wIn').value.trim(); if (w) { words = words.filter(x => x !== w.toUpperCase()); words.push(w.toUpperCase()); $('wIn').value = ''; drawWords(); } };
+$('wBody').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { words = words.filter(t => t !== b.dataset.t); drawWords(); } });
+$('wAdd').onclick = () => { const t = $('wIn').value.trim().toUpperCase(); if (t && !words.includes(t)) { words.push(t); drawWords(); } };
 $('wIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('wAdd').click(); });
 $('wReset').onclick = () => { words = DEF_WORDS.slice(); drawWords(); };
-drawWords();
+showPair(); calc(); drawWords();
 
 /* ---------- start in a working state ---------- */
 setPlain(PRESETS[0][1]);
