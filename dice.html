@@ -17,13 +17,13 @@
 html,body{height:100%;margin:0}
 body{background:radial-gradient(ellipse at 50% 35%,var(--felt) 0%,var(--felt2) 75%);color:#fff;font:16px/1.5 Archivo,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px 16px;overflow-x:clip;-webkit-tap-highlight-color:transparent}
 h1{font-size:clamp(26px,5vw,38px);line-height:1.05;margin:0;font-weight:800;letter-spacing:-.02em}
-.stage{perspective:900px;width:min(56vw,220px);aspect-ratio:1;position:relative;cursor:pointer}
+.stage{perspective:900px;width:min(50vw,220px);aspect-ratio:1;position:relative;cursor:pointer;margin:26px 0 40px}
 .shadow{position:absolute;left:10%;right:10%;bottom:-16%;height:14%;background:radial-gradient(ellipse,rgba(0,0,0,.45),transparent 70%);transition:transform .6s}
 .cube{position:absolute;inset:0;transform-style:preserve-3d;transition:transform 1s cubic-bezier(.2,.75,.25,1)}
 .face{position:absolute;inset:0;border-radius:18%;background:linear-gradient(145deg,#fff 0%,var(--ivory) 55%,#e9e3d6 100%);box-shadow:inset 0 0 0 2px #e2dccd,inset -6px -8px 18px rgba(0,0,0,.08);display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:14%}
 .face i{width:72%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 35% 30%,#4a5868,var(--pip) 60%);place-self:center;box-shadow:inset 0 2px 3px rgba(0,0,0,.5)}
 .face.f1 i:first-child{background:radial-gradient(circle at 35% 30%,#ff8a6a,var(--hot) 60%)}
-.result{margin-top:14px;font-size:clamp(20px,4vw,26px);font-weight:800;min-height:1.6em;text-align:center}
+.result{margin-top:0;font-size:clamp(20px,4vw,26px);font-weight:800;min-height:1.6em;text-align:center}
 .result b{color:#ffd2c4}
 button{font:800 20px Archivo,sans-serif;min-height:56px;padding:12px 40px;border-radius:999px;border:0;background:var(--hot);color:#fff;cursor:pointer;box-shadow:0 6px 0 #a83a1b;transition:transform .08s}
 button:active{transform:translateY(4px);box-shadow:0 2px 0 #a83a1b}
