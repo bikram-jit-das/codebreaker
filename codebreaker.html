@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monte Carlo Code Cracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE everyday learning: a classroom tool for 16-18 year olds, lively but clear
+   IDEA a code-breaker's workbench: the scrambled message laid out as letter tiles that turn green as they are cracked
+   PICTURE the live decoding (tiles) with the climbing score chart beneath it, large, at the top of the Crack tab
+   COLOUR white paper, slate ink #1f2a36, signal orange-red #e4572e for the action, teal #1b7f8c for "correct"
+   TYPE Archivo 800 for titles + Archivo text, IBM Plex Mono for the code tiles
+   LAYOUT slate top band with title and tabs; below, picture across the full width, controls in a row of panels; phone: stack */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#12171d);--ink:light-dark(#1f2a36,#e8edf2);--mute:light-dark(#5b6776,#9aa7b5);--line:light-dark(#dfe3e8,#2b3540);--panel:light-dark(#f5f6f8,#19212a);--slate:#1f2a36;--hot:#e4572e;--cool:#1b7f8c;--good:light-dark(#1b7f8c,#4fc3cf);--bad:light-dark(#c2410c,#ff8a65)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 Archivo,system-ui,sans-serif;overflow-x:clip}
+header{background:var(--slate);color:#fff;padding:20px max(4vw,16px) 0}
+h1{font-weight:800;font-size:clamp(28px,4.5vw,44px);line-height:1.05;letter-spacing:-.02em;margin:0 0 4px;text-wrap:balance}
+.sub{color:#c9d3dd;margin:0 0 14px;max-width:62ch}
+nav{display:flex;flex-wrap:wrap;gap:4px}
+nav a{color:#dbe3ea;text-decoration:none;padding:10px 16px;border-radius:10px 10px 0 0;font-weight:600;min-height:44px;display:flex;align-items:center}
+nav a.on{background:var(--bg);color:var(--ink)}
+nav a:hover:not(.on){background:#2c3a4a}
+main{padding:22px max(4vw,16px) 48px;max-width:1240px;margin:0 auto}
+section{display:none}section.on{display:block}
+h2{font-size:26px;line-height:1.1;margin:0 0 6px;letter-spacing:-.01em}
+h3{font-size:17px;margin:0 0 8px}
+p.lead{margin:0 0 16px;color:var(--mute);max-width:75ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:600 16px Archivo,sans-serif;min-height:44px;padding:8px 16px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--ink)}
+button.go{background:var(--hot);border-color:var(--hot);color:#fff}
+button.go:hover{filter:brightness(1.08)}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,nav a:focus-visible{outline:3px solid var(--cool);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+select,input[type=text],input[type=number],textarea{font:16px Archivo,sans-serif;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);min-height:44px}
+textarea{width:100%;font-family:"IBM Plex Mono",monospace;font-size:15px;resize:vertical}
+label{font-weight:600;font-size:15px}
+input[type=range]{accent-color:var(--hot);width:100%}
+input[type=checkbox]{accent-color:var(--hot);width:20px;height:20px;vertical-align:middle}
+.tiles{font:600 clamp(15px,1.9vw,19px)/1.9 "IBM Plex Mono",monospace;word-break:break-word;letter-spacing:.04em}
+.tiles span.ok{color:var(--good)}
+.tiles span.no{color:var(--bad);text-decoration:underline dotted}
+.coded{font:15px/1.6 "IBM Plex Mono",monospace;color:var(--mute);word-break:break-word;max-height:7.5em;overflow:auto}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(8.5em,1fr));gap:10px;margin:12px 0}
+.stat{border-left:3px solid var(--hot);padding:2px 10px}
+.stat b{display:block;font-size:clamp(20px,2.6vw,28px);line-height:1.15;white-space:nowrap;font-variant-numeric:tabular-nums}
+.stat small{color:var(--mute);font-size:13px}
+.fig{position:relative;height:220px}.fig>canvas{position:absolute;inset:0;width:100%;height:100%}
+.keyrow{display:grid;grid-template-columns:repeat(13,minmax(0,1fr));gap:3px;font:600 14px "IBM Plex Mono",monospace;text-align:center}
+.keyrow div{border:1px solid var(--line);border-radius:6px;padding:2px 0;background:var(--bg)}
+.keyrow i{display:block;font-style:normal;color:var(--mute);font-weight:400;font-size:12px}
+.keyrow .ok{border-color:var(--good);color:var(--good)}
+.explain{font-size:15px;line-height:1.6}
+.explain .big{font-size:20px;font-weight:800}
+.note{font-size:13px;color:var(--mute)}
+.bars{display:grid;gap:3px}
+.bars .b{display:grid;grid-template-columns:3em minmax(0,1fr) 4.5em;gap:8px;align-items:center;font-size:14px;font-variant-numeric:tabular-nums}
+.bars .b span{display:block;height:14px;background:var(--cool);border-radius:3px}
+.bars .b span.mark{background:var(--hot)}
+.dice{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+.die{width:58px;height:58px;border-radius:12px;border:2px dashed var(--line);display:grid;place-items:center;font:800 26px Archivo;color:var(--mute)}
+.die.got{border:2px solid var(--cool);background:var(--cool);color:#fff}
+.die.now{outline:3px solid var(--hot);outline-offset:2px}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.scroll{overflow-x:auto}
+.caesar-out{font:600 clamp(22px,4vw,36px)/1.3 "IBM Plex Mono",monospace;color:var(--hot);word-break:break-word;margin:8px 0}
+.list{font:15px/1.7 "IBM Plex Mono",monospace;columns:2 16em}
+.heat{position:relative;aspect-ratio:1/1;max-width:560px}
+.heat canvas{position:absolute;inset:0;width:100%;height:100%}
+#heatTip{min-height:1.6em;font-weight:600}
+@media(max-width:600px){.tiles{max-height:55vh;overflow:auto}nav a{padding:8px 12px;font-size:15px}.keyrow{grid-template-columns:repeat(9,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Monte Carlo Code Cracker</h1>
+  <p class="sub">Watch a computer crack a secret code by making millions of small random guesses.</p>
+  <nav id="tabs">
+    <a href="#crack" data-t="crack">Crack it!</a>
+    <a href="#caesar" data-t="caesar">Caesar warm-up</a>
+    <a href="#collect" data-t="collect">Collect all six</a>
+    <a href="#english" data-t="english">What English looks like</a>
+  </nav>
+</header>
+<main>
+
+<!-- ================= CRACK ================= -->
+<section id="s-crack">
+  <div class="panel">
+    <div class="row" style="justify-content:space-between">
+      <h3 style="margin:0">Computer's best guess</h3>
+      <span class="note" id="legend">Teal letters are right, orange letters are still wrong.</span>
+    </div>
+    <div class="tiles" id="decoded" aria-live="off"></div>
+    <div class="stats">
+      <div class="stat"><b id="stStep">0</b><small>steps per searcher</small></div>
+      <div class="stat"><b id="stScore">–</b><small>best score (log)</small></div>
+      <div class="stat"><b id="stTrue">–</b><small>score of the real message</small></div>
+      <div class="stat"><b id="stAcc">–</b><small>letters correct</small></div>
+    </div>
+    <div class="fig"><canvas id="chart" aria-label="Score of each searcher over time"></canvas></div>
+    <p class="note" style="margin:4px 0 0">Each line is one searcher. The dashed line is the score of the real message: when a searcher reaches it, the code is cracked. A few rare letters (like P and M) can stay mixed up: the computer only knows letter pairs, so its score can even end up a tiny bit above the real message.</p>
+  </div>
+
+  <div class="grid" style="margin-top:16px">
+    <div class="panel">
+      <h3>1. Choose a message</h3>
+      <div class="row" style="margin-bottom:8px">
+        <label for="mode">Mode</label>
+        <select id="mode">
+          <option value="plain">Scramble a message</option>
+          <option value="coded">Crack a code from a friend</option>
+        </select>
+      </div>
+      <div id="plainBox">
+        <div class="row" style="margin-bottom:8px">
+          <label for="preset">Message</label>
+          <select id="preset"></select>
+        </div>
+        <textarea id="plain" rows="5" aria-label="Message to scramble"></textarea>
+        <div class="row" style="margin-top:8px"><button id="scramble">Scramble with a random key</button></div>
+      </div>
+      <div id="codedBox" hidden>
+        <p class="note" style="margin-top:0">Paste a scrambled message. The app does not know the answer, so it cannot colour the letters.</p>
+        <textarea id="codedIn" rows="5" aria-label="Coded message"></textarea>
+        <div class="row" style="margin-top:8px"><button id="useCoded">Use this code</button></div>
+      </div>
+      <h3 style="margin-top:14px">Scrambled message</h3>
+      <div class="coded" id="codedOut"></div>
+      <div class="row" style="margin-top:8px"><button id="copyCoded">Copy code</button><span class="note" id="copyMsg"></span></div>
+    </div>
+
+    <div class="panel">
+      <h3>2. Crack it</h3>
+      <div class="row" style="margin-bottom:10px">
+        <button class="go" id="run">Crack it!</button>
+        <button id="pause" disabled>Pause</button>
+        <button id="reset">Reset</button>
+      </div>
+      <label for="speed">Speed: <span id="speedVal"></span> steps per frame</label>
+      <input type="range" id="speed" min="1" max="300" value="20">
+      <div class="row" style="margin-top:10px;gap:14px">
+        <label for="chains">Searchers</label>
+        <select id="chains"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>6</option></select>
+        <label for="steps">Steps</label>
+        <select id="steps"><option>2000</option><option>5000</option><option selected>8000</option><option>20000</option></select>
+      </div>
+      <div style="margin-top:10px"><label><input type="checkbox" id="tricks" checked> Extra tricks: adventurous start and rotate three letters</label></div>
+      <p class="note">Untick for the plain Metropolis algorithm from the slides. With one searcher and no tricks it sometimes gets stuck on a small hill: try it!</p>
+      <h3 style="margin-top:12px">Key found so far (best searcher)</h3>
+      <div class="keyrow" id="keyrow"></div>
+      <p class="note" style="margin-top:6px">Top: letter in the code. Bottom: what the computer thinks it means.</p>
+    </div>
+
+    <div class="panel">
+      <h3>3. Slow motion: one step explained</h3>
+      <button id="oneStep">Take one step (searcher 1)</button>
+      <div class="explain" id="explain" style="margin-top:10px">Press the button to see exactly what the computer does in one step: swap, score, compare, flip a biased coin.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CAESAR ================= -->
+<section id="s-caesar">
+  <h2>Warm-up: the Caesar cipher</h2>
+  <p class="lead">Caesar shifted every letter the same number of places. Move the slider to shift the message back. There are only 25 shifts, so you can try them all.</p>
+  <div class="grid">
+    <div class="panel">
+      <label for="cIn">Secret message</label>
+      <input type="text" id="cIn" value="WKLV LV IXQ" style="width:100%;font-family:'IBM Plex Mono',monospace">
+      <label for="cShift" style="display:block;margin-top:14px">Shift back by <span id="cShiftVal">0</span></label>
+      <input type="range" id="cShift" min="0" max="25" value="0">
+      <div class="caesar-out" id="cOut"></div>
+      <div class="row"><button id="cAll">Show all 25 shifts</button></div>
+    </div>
+    <div class="panel"><h3>Every shift</h3><div class="list" id="cList"><span class="note">Press "Show all 25 shifts".</span></div></div>
+  </div>
+</section>
+
+<!-- ================= COLLECT ================= -->
+<section id="s-collect">
+  <h2>Collect all six</h2>
+  <p class="lead">Each box has one of 6 figures inside, at random. How many boxes until you have all six? Roll the die to play once, then let the computer play thousands of games: that is a Monte Carlo simulation.</p>
+  <div class="grid">
+    <div class="panel">
+      <h3>Play by hand</h3>
+      <div class="dice" id="dice"></div>
+      <div class="row"><button class="go" id="roll">Open a box (roll)</button><button id="newGame">New game</button></div>
+      <p id="rollMsg" style="font-weight:600">Boxes opened: 0</p>
+      <h3 style="margin-top:18px">Your finished games</h3>
+      <p id="myGames" class="note">None yet. Keep rolling until all six squares are filled.</p>
+      <p class="note">Rolling a real die works just as well: each face is one figure.</p>
+    </div>
+    <div class="panel">
+      <h3>Let the computer play</h3>
+      <div class="row"><button id="sim1">1 game</button><button id="sim100">100 games</button><button class="go" id="sim10k">10,000 games</button><button id="simClear">Clear</button></div>
+      <div class="stats">
+        <div class="stat"><b id="gN">0</b><small>games played</small></div>
+        <div class="stat"><b id="gAvg">–</b><small>average boxes</small></div>
+        <div class="stat"><b>14.7</b><small>exact answer: 6×(1+½+⅓+¼+⅕+⅙)</small></div>
+      </div>
+      <div class="bars" id="hist"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ENGLISH ================= -->
+<section id="s-english">
+  <h2>What English looks like</h2>
+  <p class="lead">From about 3 million letters of <i>War and Peace</i>: how often each letter is followed by each other letter. This table is what the computer uses to score a guess.</p>
+  <div class="grid">
+    <div class="panel">
+      <h3>Letter-pair fingerprint</h3>
+      <div class="heat"><canvas id="heat" aria-label="Heatmap of letter pair chances"></canvas></div>
+      <p id="heatTip">Hover or tap a square.</p>
+      <p class="note">Rows: current letter. Columns: next letter. "_" means space. Darker means more common.</p>
+    </div>
+    <div class="panel">
+      <h3>Which looks most like English?</h3>
+      <div class="row"><input type="text" id="wIn" placeholder="Type a word or sentence" style="flex:1"><button class="go" id="wAdd">Score it</button><button id="wReset">Reset</button></div>
+      <div class="scroll" style="margin-top:10px"><table><thead><tr><th>Text</th><th class="n">Score</th><th class="n">Log score</th></tr></thead><tbody id="wBody"></tbody></table></div>
+      <p class="note">Score = the chances of every neighbouring pair multiplied together (including the spaces at the start and end). Higher means more English-like. The log score is easier for computers: closer to 0 is better.</p>
+      <div id="pairs" class="explain"></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+{
+/* ---------- data: log-chances of letter pairs from War and Peace (27x27, index 26 = space) ---------- */
+const LOGP=[-10.1462,-4.0766,-3.3691,-2.8914,-7.1197,-4.8015,-4.0839,-6.4731,-3.1509,-7.0958,-4.3767,-2.6625,-3.786,-1.4968,-8.4645,-3.7834,-11.1271,-2.4366,-2.3402,-1.98,-4.3944,-3.853,-4.5506,-8.2744,-3.6544,-6.275,-2.5742,-2.3813,-5.016,-9.0678,-7.6209,-1.115,-10.4541,-10.4541,-9.7609,-3.5246,-5.2836,-10.4541,-2.2555,-6.2056,-8.1515,-2.1363,-10.4541,-10.4541,-2.8632,-4.2866,-4.9011,-1.8824,-6.6039,-7.4096,-10.4541,-2.6098,-10.4541,-5.0514,-2.2155,-11.0293,-4.0727,-8.7267,-1.5461,-11.0293,-11.0293,-1.6699,-3.1757,-11.0293,-3.1564,-3.4259,-9.9306,-11.0293,-1.5693,-11.0293,-6.2586,-3.393,-6.4546,-2.702,-3.5956,-11.0293,-8.9498,-11.0293,-5.2895,-9.2375,-4.582,-3.8708,-9.1162,-9.2833,-4.5064,-2.1519,-7.2268,-5.6035,-7.7493,-2.719,-6.2131,-7.4326,-4.5591,-5.9286,-6.0078,-3.1742,-10.0717,-7.8525,-3.4989,-3.9723,-7.8099,-4.6745,-5.9097,-7.8745,-11.6812,-4.6079,-10.5825,-0.4331,-3.1602,-7.1173,-4.0642,-2.3969,-3.662,-4.5983,-4.9826,-6.0863,-4.5069,-8.2042,-7.0418,-3.4285,-3.7852,-2.4785,-5.2684,-4.5188,-7.1134,-1.9643,-2.7739,-3.745,-6.906,-4.0493,-4.5908,-4.6082,-4.4243,-7.4115,-1.0266,-2.6561,-7.5465,-10.9138,-10.9138,-2.4789,-2.9636,-10.9138,-9.5275,-2.4642,-10.9138,-8.8343,-3.8154,-9.8151,-9.122,-1.9151,-10.9138,-10.9138,-2.2724,-5.9031,-3.2401,-3.3838,-10.9138,-7.5816,-10.9138,-6.4594,-10.9138,-1.0276,-2.7173,-10.1534,-10.8465,-7.0853,-2.1672,-10.8465,-4.7462,-2.1542,-3.0221,-10.8465,-10.8465,-3.546,-7.9021,-4.0146,-2.8038,-10.8465,-10.8465,-2.9297,-4.0861,-5.7049,-3.6454,-10.8465,-7.9021,-10.8465,-6.2822,-9.7479,-0.8318,-1.8028,-7.8852,-7.8852,-7.9175,-0.8022,-7.7942,-11.3352,-10.0824,-1.8641,-12.0283,-7.464,-7.0111,-6.0934,-7.2662,-2.5014,-10.4189,-12.0283,-4.8714,-6.9721,-3.6864,-4.6499,-10.4189,-8.4174,-12.0283,-5.2326,-12.0283,-2.3549,-4.087,-4.8606,-3.0114,-2.9975,-3.021,-3.8348,-3.698,-10.2715,-5.9298,-12.0632,-4.9517,-3.0739,-2.8706,-1.276,-3.1497,-5.3346,-8.731,-3.3761,-2.0829,-2.0993,-7.188,-3.92,-10.4538,-6.2794,-11.3701,-5.6764,-3.3729,-3.2893,-7.864,-7.864,-7.864,-1.5272,-7.864,-7.864,-7.864,-5.3791,-7.864,-7.864,-7.864,-7.864,-7.864,-1.289,-7.864,-7.864,-7.864,-7.864,-7.864,-0.7865,-7.864,-7.864,-7.864,-7.864,-7.864,-6.2546,-3.6018,-7.8467,-6.0549,-8.5398,-1.285,-7.2871,-7.3612,-3.2193,-1.7943,-9.9261,-9.9261,-4.0972,-6.5249,-2.2899,-3.9625,-9.233,-9.9261,-5.3618,-3.3087,-8.1344,-3.4085,-7.3612,-5.5073,-9.9261,-5.311,-9.9261,-1.3372,-2.5312,-7.2012,-7.2152,-2.6367,-1.7422,-3.7355,-7.012,-9.8684,-2.3182,-11.4779,-4.5338,-1.9893,-5.5041,-6.6657,-2.4499,-5.5351,-10.7847,-5.338,-4.128,-4.0742,-4.1534,-5.4281,-5.3294,-11.4779,-2.2665,-8.2198,-1.9735,-1.8913,-4.0393,-7.4187,-11.0296,-1.4044,-6.1318,-10.3364,-11.0296,-2.5259,-11.0296,-9.0837,-5.9358,-3.7976,-5.6002,-2.222,-2.889,-11.0296,-6.6229,-3.47,-6.9352,-3.6072,-11.0296,-9.0837,-11.0296,-3.2229,-11.0296,-1.5622,-3.5084,-7.0999,-3.0072,-1.673,-2.5191,-5.3071,-1.9974,-7.154,-3.3925,-7.328,-4.8153,-4.4717,-7.1893,-4.5482,-2.6759,-7.5595,-6.6307,-7.8063,-3.3957,-2.4437,-5.2611,-5.4984,-7.451,-7.705,-4.4846,-8.9883,-1.4617,-4.9295,-5.3602,-4.9316,-4.1348,-5.9367,-2.423,-5.509,-6.2704,-4.4442,-7.3553,-4.0331,-3.2461,-2.8475,-1.9526,-3.2779,-4.1351,-8.9012,-2.2672,-3.3417,-2.9474,-2.0924,-3.4757,-2.9567,-7.2035,-5.5926,-7.4057,-1.9521,-2.3026,-8.2419,-5.8748,-9.6282,-1.7142,-6.1117,-8.4242,-4.6961,-2.3832,-10.7268,-7.7824,-2.3787,-7.3946,-8.5296,-2.258,-2.8536,-10.7268,-1.7578,-3.7467,-3.0452,-3.6638,-10.7268,-7.7311,-10.7268,-4.9217,-10.7268,-2.5287,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-0.0115,-7.7651,-7.7651,-7.7651,-7.7651,-7.7651,-7.072,-2.888,-6.5421,-4.6144,-3.5292,-1.4264,-5.801,-4.666,-6.5515,-2.4312,-10.8095,-5.0804,-4.7692,-3.926,-4.0599,-2.3076,-5.6073,-9.269,-3.4056,-2.9115,-3.474,-3.8908,-5.3484,-6.2804,-11.9081,-3.2515,-7.4892,-1.506,-2.9641,-5.9466,-4.2922,-7.8422,-2.2278,-6.2939,-8.1944,-2.7097,-2.8866,-10.6148,-4.3255,-4.9093,-4.5697,-5.9143,-2.9468,-3.9177,-6.8652,-8.743,-2.8226,-2.216,-3.7183,-7.619,-5.4938,-12.001,-6.0795,-10.3916,-0.9352,-3.3841,-9.5576,-5.8766,-10.9439,-2.471,-7.1045,-10.0276,-1.1217,-2.7889,-12.3302,-9.9323,-4.3242,-6.7135,-7.1428,-2.2539,-8.569,-12.3302,-3.6901,-4.0607,-3.9438,-4.2937,-9.4398,-5.2706,-11.6371,-4.2798,-7.403,-1.2902,-3.891,-4.2682,-3.4504,-3.8245,-3.5261,-5.2743,-2.9835,-7.2082,-3.6115,-10.3863,-6.036,-2.3333,-3.8583,-1.999,-6.0755,-3.1499,-10.3863,-2.0871,-1.9833,-1.7728,-11.0794,-6.6849,-9.9808,-7.2952,-7.9884,-6.6486,-2.7678,-2.7162,-10.2078,-10.2078,-10.2078,-0.6249,-10.2078,-8.8215,-10.2078,-1.7333,-10.2078,-8.0106,-4.8325,-10.2078,-3.9293,-2.9114,-10.2078,-10.2078,-5.7305,-4.6395,-9.1092,-7.0723,-9.5147,-9.5147,-10.2078,-5.5165,-10.2078,-2.1128,-1.5831,-9.0434,-8.1561,-5.0812,-2.0328,-7.1826,-10.9893,-1.6028,-1.7766,-10.9893,-6.8304,-5.6909,-9.8907,-3.2826,-2.5561,-10.2961,-10.9893,-4.7183,-4.3976,-8.9098,-7.5881,-10.9893,-8.0989,-10.9893,-7.3004,-10.9893,-1.9439,-2.5688,-8.3919,-1.9916,-8.3919,-2.6393,-8.3919,-8.3919,-4.2975,-2.1496,-8.3919,-8.3919,-7.2932,-8.3919,-8.3919,-6.6001,-1.1796,-6.7824,-8.3919,-8.3919,-2.2349,-5.5015,-3.3356,-8.3919,-3.323,-6.7824,-8.3919,-2.4283,-3.5788,-5.7321,-5.6188,-8.1037,-2.8857,-6.1476,-8.4402,-8.1778,-3.7252,-10.7427,-7.0792,-5.4295,-5.6188,-6.8926,-2.0456,-6.6997,-10.7427,-6.3119,-3.5619,-4.0632,-6.6319,-10.0496,-6.336,-10.7427,-10.7427,-8.3448,-0.3695,-2.8618,-7.789,-7.789,-4.4568,-1.1905,-7.789,-7.789,-2.7456,-2.2837,-7.789,-6.1796,-4.0049,-3.6302,-4.8987,-1.3386,-7.789,-7.789,-7.789,-6.6904,-7.789,-4.3551,-7.789,-7.0959,-7.789,-5.081,-3.9178,-2.3126,-2.1193,-3.1349,-3.2936,-3.5053,-3.8869,-3.2973,-4.0694,-2.4551,-2.9271,-5.8574,-4.9109,-3.6928,-3.3838,-3.5836,-2.8337,-3.4212,-6.0095,-3.6214,-2.5177,-1.8707,-4.6308,-4.6918,-2.6561,-7.1635,-4.423,-6.7397,-13.275];
+const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const lp = (a, b) => LOGP[a * 27 + b];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = id => document.getElementById(id);
+
+/* text -> states: 0..25 letters, 26 = space; runs of non-letters squash to one 26; starts and ends with 26 */
+function states(text) {
+  const out = [26];
+  for (const ch of text.toUpperCase()) {
+    const i = A.indexOf(ch);
+    const v = i >= 0 ? i : 26;
+    if (!(v === 26 && out[out.length - 1] === 26)) out.push(v);
+  }
+  if (out[out.length - 1] !== 26) out.push(26);
+  return out;
+}
+const logScore = text => { const s = states(text); let t = 0; for (let i = 0; i + 1 < s.length; i++) t += lp(s[i], s[i + 1]); return t; };
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+/* ---------- tabs ---------- */
+const tabs = ['crack', 'caesar', 'collect', 'english'];
+function show() {
+  const t = tabs.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'crack';
+  for (const x of tabs) { $('s-' + x).classList.toggle('on', x === t); document.querySelector(`nav a[data-t=${x}]`).classList.toggle('on', x === t); }
+  if (t === 'english') drawHeat();
+  if (t === 'crack') drawChart();
+}
+window.addEventListener('hashchange', show);
+
+/* ================= CRACK ================= */
+const PRESETS = [
+  ['Hamlet: "To be, or not to be" (long)', "To be, or not to be, that is the question: Whether tis nobler in the mind to suffer the slings and arrows of outrageous fortune, or to take arms against a sea of troubles and by opposing end them. To die, to sleep, no more; and by a sleep to say we end the heart-ache and the thousand natural shocks that flesh is heir to: tis a consummation devoutly to be wished. To die, to sleep; to sleep, perchance to dream, ay, there's the rub: for in that sleep of death what dreams may come, when we have shuffled off this mortal coil, must give us pause."],
+  ['Gettysburg Address (long)', "Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting place for those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this."],
+  ['A Tale of Two Cities (medium)', "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness, it was the epoch of belief, it was the epoch of incredulity, it was the season of Light, it was the season of Darkness, it was the spring of hope, it was the winter of despair."],
+  ['Hamlet, first line only (short)', "Enter Hamlet. To be or not to be, that is the question."],
+  ['An assassin sins (very short)', "An assassin sins"],
+  ['Type your own message', ""]
+];
+$('preset').innerHTML = PRESETS.map((p, i) => `<option value="${i}">${esc(p[0])}</option>`).join('');
+const COLORS = ['#e4572e', '#1b7f8c', '#7a5cc4', '#d49a00', '#3b8b3b', '#c2417a'];
+
+const S = { plain: '', coded: '', truthLk: null, cs: [], chains: [], step: 0, running: false, trueScore: null, raf: 0 };
+
+function setPlain(txt) { $('plain').value = txt; }
+function scramble() {
+  const txt = $('plain').value.trim();
+  if (!txt) { $('codedOut').textContent = 'Type a message first.'; return; }
+  const key = shuffle(A.split(''));            // key[i] = code letter used for real letter i
+  const coded = [...txt.toUpperCase()].map(ch => { const i = A.indexOf(ch); return i >= 0 ? key[i] : ch; }).join('');
+  const lk = new Array(26); key.forEach((c, i) => lk[A.indexOf(c)] = i);  // code letter -> real letter
+  loadCode(coded, txt.toUpperCase(), lk);
+}
+function loadCode(coded, truth, truthLk) {
+  stop();
+  S.coded = coded; S.plain = truth; S.truthLk = truthLk; S.cs = states(coded);
+  S.trueScore = truth ? logScore(truth) : null;
+  $('codedOut').textContent = coded;
+  $('legend').hidden = !truth;
+  resetChains();
+}
+function scoreLk(lk) {
+  const cs = S.cs; let t = 0, prev = 26;
+  for (let i = 1; i < cs.length; i++) { const d = cs[i] === 26 ? 26 : lk[cs[i]]; t += lp(prev, d); prev = d; }
+  return t;
+}
+function resetChains() {
+  const n = +$('chains').value;
+  S.chains = Array.from({ length: n }, () => { const lk = shuffle([...Array(26).keys()]); return { lk, score: scoreLk(lk), trace: [] }; });
+  S.chains.forEach(c => c.trace.push(c.score));
+  S.step = 0; render(); $('explain').textContent = 'Press the button to see exactly what the computer does in one step: swap, score, compare, flip a biased coin.';
+}
+function temperature(i) {
+  if (!$('tricks').checked) return 1;
+  const total = +$('steps').value, T0 = 2;
+  return Math.max(1, T0 - (T0 - 1) * i / (0.6 * total));
+}
+function propose(lk, swapOnly) {
+  const nk = lk.slice();
+  if (!swapOnly && $('tricks').checked && Math.random() < 0.3) {
+    const r = shuffle([...Array(26).keys()]).slice(0, 3);
+    nk[r[0]] = lk[r[1]]; nk[r[1]] = lk[r[2]]; nk[r[2]] = lk[r[0]];
+    return { nk, moved: r };
+  }
+  let a = Math.floor(Math.random() * 26), b = Math.floor(Math.random() * 25); if (b >= a) b++;
+  nk[a] = lk[b]; nk[b] = lk[a];
+  return { nk, moved: [a, b] };
+}
+function stepChain(c, T, swapOnly) {
+  const { nk, moved } = propose(c.lk, swapOnly);
+  const ns = scoreLk(nk), u = Math.random(), p = Math.min(1, Math.exp((ns - c.score) / T));
+  const acc = u < p, old = c.score, oldLk = c.lk;
+  if (acc) { c.lk = nk; c.score = ns; }
+  return { moved, oldLk, nk, old, ns, p, u, acc, T };
+}
+const decode = lk => [...S.coded].map(ch => { const i = A.indexOf(ch); return i >= 0 ? A[lk[i]] : ch; }).join('');
+const best = () => S.chains.reduce((a, b) => b.score > a.score ? b : a);
+
+function render() {
+  if (!S.coded) return;
+  const b = best(), dec = decode(b.lk);
+  if (S.plain) {
+    let ok = 0, n = 0;
+    $('decoded').innerHTML = [...dec].map((ch, i) => {
+      const t = S.plain[i]; if (A.indexOf(t) < 0) return esc(ch);
+      n++; const good = ch === t; if (good) ok++;
+      return `<span class="${good ? 'ok' : 'no'}">${esc(ch)}</span>`;
+    }).join('');
+    $('stAcc').textContent = n ? Math.round(100 * ok / n) + '%' : '–';
+    $('stTrue').textContent = S.trueScore.toFixed(0);
+  } else {
+    $('decoded').textContent = dec; $('stAcc').textContent = '?'; $('stTrue').textContent = '?';
+  }
+  $('stStep').textContent = S.step.toLocaleString();
+  $('stScore').textContent = b.score.toFixed(0);
+  const used = new Set([...S.coded].filter(ch => A.includes(ch)));
+  $('keyrow').innerHTML = A.split('').map((c, i) => {
+    const has = used.has(c), g = b.lk[i];
+    const good = S.truthLk && has && S.truthLk[i] === g;
+    return `<div class="${good ? 'ok' : ''}" style="${has ? '' : 'opacity:.35'}">${c}<i>${A[g]}</i></div>`;
+  }).join('');
+  drawChart();
+}
+function drawChart() {
+  const cv = $('chart'); if (!cv.offsetParent) return;
+  const W = cv.clientWidth, H = cv.clientHeight, dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  const ink = getComputedStyle(document.body).color;
+  g.clearRect(0, 0, W, H); g.font = '13px Archivo, sans-serif'; g.fillStyle = ink;
+  const L = 54, R = 12, T = 12, B = 26;
+  if (!S.chains.length) return;
+  const total = Math.max(+$('steps').value, S.step);
+  let lo = Infinity, hi = -Infinity;
+  for (const c of S.chains) for (const v of c.trace) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (S.trueScore !== null) hi = Math.max(hi, S.trueScore);
+  if (hi - lo < 10) lo = hi - 10;
+  const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
+  const x = i => L + (W - L - R) * i / total, y = v => T + (H - T - B) * (hi - v) / (hi - lo);
+  g.strokeStyle = ink; g.globalAlpha = 0.35; g.lineWidth = 1; g.beginPath(); g.moveTo(L, T); g.lineTo(L, H - B); g.lineTo(W - R, H - B); g.stroke(); g.globalAlpha = 1;
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  for (let k = 0; k <= 3; k++) { const v = lo + (hi - lo) * k / 3; g.fillText(Math.round(v), L - 6, y(v)); }
+  g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText('steps', (L + W - R) / 2, H - B + 6);
+  g.textAlign = 'left'; g.fillText('0', L, H - B + 6); g.textAlign = 'right'; g.fillText(total.toLocaleString(), W - R, H - B + 6);
+  if (S.trueScore !== null) { g.setLineDash([6, 5]); g.strokeStyle = ink; g.beginPath(); g.moveTo(L, y(S.trueScore)); g.lineTo(W - R, y(S.trueScore)); g.stroke(); g.setLineDash([]); }
+  S.chains.forEach((c, k) => {
+    g.strokeStyle = COLORS[k % COLORS.length]; g.lineWidth = 2; g.beginPath();
+    const n = c.trace.length, stride = Math.max(1, Math.floor(n / (W - L)));
+    for (let i = 0; i < n; i += stride) { const X = x(i), Y = y(c.trace[i]); i ? g.lineTo(X, Y) : g.moveTo(X, Y); }
+    g.lineTo(x(n - 1), y(c.trace[n - 1])); g.stroke();
+  });
+}
+function loop() {
+  if (!S.running) return;
+  const per = +$('speed').value, total = +$('steps').value;
+  for (let k = 0; k < per && S.step < total; k++) {
+    S.step++; const T = temperature(S.step);
+    for (const c of S.chains) { stepChain(c, T); c.trace.push(c.score); }
+  }
+  render();
+  if (S.step >= total) { stop(); $('run').textContent = 'Keep going'; return; }
+  S.raf = requestAnimationFrame(loop);
+}
+function start() {
+  if (!S.coded) scramble();
+  if (S.step >= +$('steps').value) { const opts = [...$('steps').options].map(o => +o.value); const nx = opts.find(v => v > S.step); if (nx) $('steps').value = nx; else return; }
+  S.running = true; $('pause').disabled = false; $('run').disabled = true; loop();
+}
+function stop() { S.running = false; cancelAnimationFrame(S.raf); $('pause').disabled = true; $('run').disabled = false; $('run').textContent = 'Crack it!'; }
+
+function explainStep() {
+  if (!S.coded) scramble();
+  stop();
+  const c = S.chains[0], T = temperature(S.step + 1), r = stepChain(c, T, true);
+  S.step++; S.chains.forEach((ch, k) => { if (k) ch.trace.push(ch.score); }); c.trace.push(c.score);
+  const m = 'swap two letters of the key. ' + r.moved.map(i => `Code <b>${A[i]}</b> now means <b>${A[r.nk[i]]}</b> (was ${A[r.oldLk[i]]})`).join('; ');
+  const diff = r.ns - r.old;
+  const verdict = diff >= 0 ? 'The new key is <b>better</b>, so it is always accepted.'
+    : `The new key is <b>worse</b> by ${(-diff).toFixed(1)}. Chance of accepting it anyway: p = e<sup>${(diff / r.T).toFixed(1)}</sup> = <b>${r.p < 0.0001 ? r.p.toExponential(1) : r.p.toFixed(4)}</b>${r.T > 1.001 ? ` (temperature ${r.T.toFixed(2)})` : ''}. The random coin gave ${r.u.toFixed(4)}, ${r.acc ? 'which is smaller than p' : 'which is not smaller than p'}.`;
+  $('explain').innerHTML = `<div>1. Random change: ${m}.</div><div>2. Old score ${r.old.toFixed(1)}, new score ${r.ns.toFixed(1)}.</div><div>3. ${verdict}</div><div class="big" style="color:${r.acc ? 'var(--good)' : 'var(--bad)'}">${r.acc ? 'Accepted: keep the new key.' : 'Rejected: keep the old key.'}</div>`;
+  render();
+}
+
+$('preset').onchange = () => { setPlain(PRESETS[+$('preset').value][1]); if ($('plain').value) scramble(); else { stop(); $('plain').focus(); } };
+$('scramble').onclick = scramble;
+$('mode').onchange = () => { const coded = $('mode').value === 'coded'; $('plainBox').hidden = coded; $('codedBox').hidden = !coded; };
+$('useCoded').onclick = () => { const t = $('codedIn').value.trim().toUpperCase(); if (t) loadCode(t, '', null); };
+$('copyCoded').onclick = () => { if (!S.coded) return; navigator.clipboard.writeText(S.coded).then(() => $('copyMsg').textContent = 'Copied.', () => $('copyMsg').textContent = 'Select the text above and copy it.'); };
+$('run').onclick = start; $('pause').onclick = stop;
+$('reset').onclick = () => { stop(); resetChains(); };
+$('chains').onchange = () => { stop(); resetChains(); };
+$('speed').oninput = () => $('speedVal').textContent = $('speed').value; $('speedVal').textContent = $('speed').value;
+$('oneStep').onclick = explainStep;
+const ro = new ResizeObserver(() => drawChart()); ro.observe($('chart'));
+
+/* ================= CAESAR ================= */
+const shiftBack = (t, s) => [...t.toUpperCase()].map(ch => { const i = A.indexOf(ch); return i >= 0 ? A[(i - s + 26) % 26] : ch; }).join('');
+function caesar() { const s = +$('cShift').value; $('cShiftVal').textContent = s; $('cOut').textContent = shiftBack($('cIn').value, s); }
+$('cShift').oninput = caesar; $('cIn').oninput = caesar;
+$('cAll').onclick = () => { $('cList').innerHTML = Array.from({ length: 25 }, (_, k) => `<div>${String(k + 1).padStart(2, ' ')}: ${esc(shiftBack($('cIn').value, k + 1))}</div>`).join(''); };
+caesar();
+
+/* ================= COLLECT ================= */
+let seen = new Set(), opened = 0;
+const games = [], mine = [];
+function drawDice(now) {
+  $('dice').innerHTML = [1, 2, 3, 4, 5, 6].map(f => `<div class="die ${seen.has(f) ? 'got' : ''} ${now === f ? 'now' : ''}">${f}</div>`).join('');
+  $('rollMsg').textContent = seen.size === 6 ? `All six collected after ${opened} boxes!` : `Boxes opened: ${opened}` + (now ? ` (last box: figure ${now})` : '');
+}
+$('roll').onclick = () => {
+  if (seen.size === 6) { seen = new Set(); opened = 0; }
+  const f = 1 + Math.floor(Math.random() * 6); seen.add(f); opened++; drawDice(f);
+  if (seen.size === 6) { mine.push(opened); $('myGames').textContent = `${mine.join(', ')} boxes. Your average: ${(mine.reduce((a, b) => a + b, 0) / mine.length).toFixed(1)}`; }
+};
+$('newGame').onclick = () => { seen = new Set(); opened = 0; drawDice(); };
+const playOnce = () => { const s = new Set(); let n = 0; while (s.size < 6) { s.add(1 + Math.floor(Math.random() * 6)); n++; } return n; };
+function sim(n) { for (let i = 0; i < n; i++) games.push(playOnce()); drawHist(); }
+function drawHist() {
+  $('gN').textContent = games.length.toLocaleString();
+  $('gAvg').textContent = games.length ? (games.reduce((a, b) => a + b, 0) / games.length).toFixed(2) : '–';
+  if (!games.length) { $('hist').innerHTML = '<p class="note">No games yet.</p>'; return; }
+  const cnt = {}; let mx = 0; for (const g of games) { const k = g >= 30 ? 30 : g; cnt[k] = (cnt[k] || 0) + 1; mx = Math.max(mx, cnt[k]); }
+  const rows = []; for (let k = 6; k <= 30; k++) rows.push(`<div class="b"><small>${k === 30 ? '30+' : k}</small><span class="${k === 15 ? 'mark' : ''}" style="width:${(100 * (cnt[k] || 0) / mx).toFixed(1)}%"></span><small>${(cnt[k] || 0).toLocaleString()}</small></div>`);
+  $('hist').innerHTML = rows.join('') + '<p class="note">Bars: how many games needed that many boxes. Orange bar: 15 boxes, close to the average.</p>';
+}
+$('sim1').onclick = () => sim(1); $('sim100').onclick = () => sim(100); $('sim10k').onclick = () => sim(10000);
+$('simClear').onclick = () => { games.length = 0; drawHist(); };
+drawDice(); drawHist();
+
+/* ================= ENGLISH ================= */
+const LAB = A + '_';
+const heatCv = $('heat');
+function drawHeat() {
+  if (!heatCv.offsetParent) return;
+  const W = heatCv.clientWidth, dpr = window.devicePixelRatio || 1;
+  heatCv.width = W * dpr; heatCv.height = W * dpr; const g = heatCv.getContext('2d'); g.scale(dpr, dpr);
+  const ink = getComputedStyle(document.body).color, dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light' || document.documentElement.dataset.theme === 'dark';
+  const m = 20, cell = (W - m) / 27;
+  g.clearRect(0, 0, W, W); g.font = `${Math.max(9, Math.min(13, cell * 0.8))}px "IBM Plex Mono", monospace`; g.fillStyle = ink; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (let i = 0; i < 27; i++) { g.fillText(LAB[i], m + cell * (i + 0.5), m / 2); g.fillText(LAB[i], m / 2, m + cell * (i + 0.5)); }
+  for (let r = 0; r < 27; r++) for (let c = 0; c < 27; c++) {
+    const p = Math.exp(lp(r, c)), v = Math.pow(p, 0.5);
+    const shade = dark ? Math.round(18 + 237 * v) : Math.round(255 - 235 * v);
+    g.fillStyle = dark ? `rgb(${Math.round(shade * .55)},${Math.round(shade * .85)},${shade})` : `rgb(${shade},${shade},${shade})`;
+    g.fillRect(m + c * cell + 0.5, m + r * cell + 0.5, cell - 1, cell - 1);
+  }
+}
+function heatAt(e) {
+  const rc = heatCv.getBoundingClientRect(), W = rc.width, m = 20, cell = (W - m) / 27;
+  const c = Math.floor((e.clientX - rc.left - m) / cell), r = Math.floor((e.clientY - rc.top - m) / cell);
+  if (r < 0 || c < 0 || r > 26 || c > 26) return;
+  const nm = i => i === 26 ? 'space' : A[i];
+  $('heatTip').textContent = `${nm(r)} followed by ${nm(c)}: ${(100 * Math.exp(lp(r, c))).toFixed(2)}%`;
+}
+heatCv.addEventListener('pointermove', heatAt); heatCv.addEventListener('pointerdown', heatAt);
+const ro2 = new ResizeObserver(() => drawHeat()); ro2.observe(heatCv);
+
+const DEF_WORDS = ['THE', 'HTE', 'ETH', 'QXJ'];
+let words = DEF_WORDS.slice();
+function drawWords() {
+  const rows = words.map(w => ({ w, s: logScore(w) })).sort((a, b) => b.s - a.s);
+  $('wBody').innerHTML = rows.map(r => `<tr><td style="font-family:'IBM Plex Mono',monospace">${esc(r.w)}</td><td class="n">${Math.exp(r.s) < 0.001 ? Math.exp(r.s).toExponential(1) : Math.exp(r.s).toFixed(4)}</td><td class="n">${r.s.toFixed(1)}</td></tr>`).join('');
+  const top = words[words.length - 1], st = states(top), nm = i => i === 26 ? '_' : A[i];
+  const parts = []; for (let i = 0; i + 1 < st.length && i < 40; i++) parts.push(`${nm(st[i])}${nm(st[i + 1])} ${(100 * Math.exp(lp(st[i], st[i + 1]))).toFixed(1)}%`);
+  $('pairs').innerHTML = `<p style="margin:10px 0 0"><b>Pairs in "${esc(top)}":</b> ${esc(parts.join(' × '))}${st.length > 41 ? ' …' : ''}</p>`;
+}
+$('wAdd').onclick = () => { const w = $('wIn').value.trim(); if (w) { words = words.filter(x => x !== w.toUpperCase()); words.push(w.toUpperCase()); $('wIn').value = ''; drawWords(); } };
+$('wIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('wAdd').click(); });
+$('wReset').onclick = () => { words = DEF_WORDS.slice(); drawWords(); };
+drawWords();
+
+/* ---------- start in a working state ---------- */
+setPlain(PRESETS[0][1]);
+scramble();
+show();
+}
+</script>
+</body>
+</html>

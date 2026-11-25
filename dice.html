@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dice Roller</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE everyday classroom toy: one big die, nothing else to read
+   IDEA a real die on a felt games table
+   PICTURE a large 3D die that tumbles when tapped
+   COLOUR deep teal felt, ivory die with slate pips, orange-red roll button
+   TYPE Archivo 800 for the result, Archivo 600 for labels
+   LAYOUT one centred column: die, result, button, six seen-faces chips; same on phone */
+:root{color-scheme:dark;--felt:#0f5961;--felt2:#0a3f45;--ivory:#fbf8f1;--pip:#1f2a36;--hot:#e4572e}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%;margin:0}
+body{background:radial-gradient(ellipse at 50% 35%,var(--felt) 0%,var(--felt2) 75%);color:#fff;font:16px/1.5 Archivo,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px 16px;overflow-x:clip;-webkit-tap-highlight-color:transparent}
+h1{font-size:clamp(26px,5vw,38px);line-height:1.05;margin:0;font-weight:800;letter-spacing:-.02em}
+.stage{perspective:900px;width:min(56vw,220px);aspect-ratio:1;position:relative;cursor:pointer}
+.shadow{position:absolute;left:10%;right:10%;bottom:-16%;height:14%;background:radial-gradient(ellipse,rgba(0,0,0,.45),transparent 70%);transition:transform .6s}
+.cube{position:absolute;inset:0;transform-style:preserve-3d;transition:transform 1s cubic-bezier(.2,.75,.25,1)}
+.face{position:absolute;inset:0;border-radius:18%;background:linear-gradient(145deg,#fff 0%,var(--ivory) 55%,#e9e3d6 100%);box-shadow:inset 0 0 0 2px #e2dccd,inset -6px -8px 18px rgba(0,0,0,.08);display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:14%}
+.face i{width:72%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 35% 30%,#4a5868,var(--pip) 60%);place-self:center;box-shadow:inset 0 2px 3px rgba(0,0,0,.5)}
+.face.f1 i:first-child{background:radial-gradient(circle at 35% 30%,#ff8a6a,var(--hot) 60%)}
+.result{margin-top:14px;font-size:clamp(20px,4vw,26px);font-weight:800;min-height:1.6em;text-align:center}
+.result b{color:#ffd2c4}
+button{font:800 20px Archivo,sans-serif;min-height:56px;padding:12px 40px;border-radius:999px;border:0;background:var(--hot);color:#fff;cursor:pointer;box-shadow:0 6px 0 #a83a1b;transition:transform .08s}
+button:active{transform:translateY(4px);box-shadow:0 2px 0 #a83a1b}
+button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+button.ghost{background:transparent;box-shadow:none;border:2px solid rgba(255,255,255,.5);font-size:16px;min-height:44px;padding:8px 22px}
+.seen{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.chip{width:42px;height:42px;border-radius:10px;border:2px dashed rgba(255,255,255,.4);display:grid;place-items:center;font-weight:800;font-size:18px;color:rgba(255,255,255,.45)}
+.chip.on{border:2px solid var(--ivory);background:var(--ivory);color:var(--pip)}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center}
+.count{font-size:17px;color:#d6ecee}
+@media(prefers-reduced-motion:reduce){.cube{transition:none}}
+</style>
+</head>
+<body>
+  <h1>Roll the die</h1>
+  <div class="stage" id="stage" role="button" tabindex="0" aria-label="Roll the die">
+    <div class="shadow" id="shadow"></div>
+    <div class="cube" id="cube"></div>
+  </div>
+  <div class="result" id="result" aria-live="polite">Tap the die or press Roll</div>
+  <button id="roll">Roll</button>
+  <div class="seen" id="seen" aria-label="Faces seen so far"></div>
+  <div class="row"><span class="count" id="count">Rolls: 0</span><button class="ghost" id="reset">New game</button></div>
+<script>
+{
+  // pip positions on a 3x3 grid (cells 1..9)
+  const PIPS = {1:[5],2:[1,9],3:[1,5,9],4:[1,3,7,9],5:[1,3,5,7,9],6:[1,3,4,6,7,9]};
+  // where each face sits on the cube, and the cube rotation that brings it to the front
+  const PLACE = {1:'rotateY(0deg)',6:'rotateY(180deg)',2:'rotateY(90deg)',5:'rotateY(-90deg)',3:'rotateX(90deg)',4:'rotateX(-90deg)'};
+  const SHOW  = {1:[0,0],6:[0,180],2:[0,-90],5:[0,90],3:[-90,0],4:[90,0]};
+  const cube = document.getElementById('cube');
+  const half = () => cube.clientWidth / 2;
+  function build() {
+    cube.innerHTML = [1,2,3,4,5,6].map(n => {
+      const cells = Array.from({length:9}, (_, k) => PIPS[n].includes(k + 1) ? `<i style="grid-area:${Math.floor(k/3)+1}/${k%3+1}"></i>` : '').join('');
+      return `<div class="face f${n}" data-n="${n}">${cells}</div>`;
+    }).join('');
+    place();
+  }
+  function place() { for (const f of cube.children) f.style.transform = `${PLACE[f.dataset.n]} translateZ(${half()}px)`; }
+  let spinX = 0, spinY = 0, rolls = 0, busy = false;
+  const seen = new Set();
+  function drawSeen() {
+    document.getElementById('seen').innerHTML = [1,2,3,4,5,6].map(n => `<div class="chip ${seen.has(n) ? 'on' : ''}">${n}</div>`).join('');
+    document.getElementById('count').textContent = `Rolls: ${rolls}`;
+  }
+  function roll() {
+    if (busy) return; busy = true;
+    const n = 1 + Math.floor(Math.random() * 6);
+    spinX += 720 + 360 * Math.floor(Math.random() * 2); spinY += 720 + 360 * Math.floor(Math.random() * 2);
+    const [x, y] = SHOW[n];
+    cube.style.transform = `translateZ(-${half()}px) rotateX(-14deg) rotateY(18deg) rotateX(${spinX + x}deg) rotateY(${spinY + y}deg)`;
+    spinX -= spinX % 360; spinY -= spinY % 360;
+    document.getElementById('result').textContent = 'Rolling…';
+    const done = () => {
+      rolls++; seen.add(n); drawSeen();
+      document.getElementById('result').innerHTML = seen.size === 6 && !roll.finished
+        ? `You rolled a <b>${n}</b>. All six seen in <b>${rolls}</b> rolls!`
+        : `You rolled a <b>${n}</b>`;
+      if (seen.size === 6) roll.finished = true;
+      busy = false;
+    };
+    matchMedia('(prefers-reduced-motion: reduce)').matches ? done() : setTimeout(done, 1000);
+  }
+  document.getElementById('roll').onclick = roll;
+  const st = document.getElementById('stage');
+  st.onclick = roll;
+  st.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); roll(); } };
+  document.getElementById('reset').onclick = () => { seen.clear(); rolls = 0; roll.finished = false; drawSeen(); document.getElementById('result').textContent = 'Tap the die or press Roll'; };
+  const ro = new ResizeObserver(() => { place(); cube.style.transform = cube.style.transform.replace(/translateZ\(-[\d.]+px\)/, `translateZ(-${half()}px)`); });
+  ro.observe(cube);
+  build(); drawSeen();
+  cube.style.transform = `translateZ(-${half()}px) rotateX(-14deg) rotateY(18deg) rotateX(-20deg) rotateY(25deg)`;
+}
+</script>
+</body>
+</html>
